@@ -147,16 +147,16 @@ def main(_):
 
   print('test accuracy %g' % sess.run(accuracy, feed_dict={x: mnist.test.images, y_: mnist.test.labels, keep_prob: 1.0}))
         
-  # calculate gradient for a specific class
+  # Fool an image from certain class to be predicted as a different class
   newClass = 6                                    
   oldClass = 2 
   numSam = 10  
-  
+
+  # calculate gradient for a specific class
   depth = 10                                  
   indices = np.zeros(depth)                               
   indices[newClass] = 1.0 
   maskLogit = tf.constant(indices, dtype=tf.float32)  
-#  maskY = y_conv   
   maskY = tf.multiply(maskLogit, y_conv)   
   cross_entropy = tf.nn.softmax_cross_entropy_with_logits(labels=y_, logits=maskY)
   xGrad = tf.gradients(cross_entropy, x)[0]   
@@ -164,21 +164,23 @@ def main(_):
   testLbls = mnist.test.labels
   oneHot2s = np.zeros(10)-1
   oneHot2s[oldClass] = 1
-#  print(testLbls.shape)
-  
+
+  # extract the images from a certain class
   mask2s = (testLbls == oneHot2s)  
   mask2s = np.sum(mask2s, axis=1)
   mask2s = mask2s == 1
   imgs2s = testImgs[mask2s] 
   imgs = imgs2s[:numSam]
-#  print(imgs2s.shape)     
+  
+  # calculate gradient for a specific class of model  
   oneHot6s = np.zeros((numSam, 10))
   oneHot6s[:,newClass] = 1 
   for m in xrange(4):       
       xGradVal = sess.run(xGrad, feed_dict={x: imgs, y_: oneHot6s, keep_prob: 1.0})
       xGradVal = -0.05 * np.sign(xGradVal)
       imgs = imgs+xGradVal
-      
+
+  # Save the image, delta and manipulated image (predicted as a different class)    
   xGradVal2D = np.reshape(xGradVal, (numSam, 28, 28))
   imgs2s2D = np.reshape(imgs2s[:numSam], (numSam, 28, 28))
   wholeImgs = np.zeros((28*numSam, 28*3))
@@ -186,12 +188,9 @@ def main(_):
       wholeImgs[28*(n+0):28*(n+1), 28*0:28*1] = imgs2s2D[n]
       wholeImgs[28*(n+0):28*(n+1), 28*1:28*2] = xGradVal2D[n]
       wholeImgs[28*(n+0):28*(n+1), 28*2:28*3] = imgs2s2D[n] + xGradVal2D[n]
-
   scipy.misc.imsave('wholeImgs.jpg', wholeImgs)
 
-#  imgs2s = imgs2s+xGradVal
-
-  # Test trained model    
+  # Test the manipulated images on the trained model    
   correct_prediction = tf.equal(tf.argmax(y_conv, 1), tf.argmax(y_, 1))
   accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))                      
   print(sess.run(accuracy, feed_dict={x: imgs, y_: oneHot6s, keep_prob: 1.0}))        
